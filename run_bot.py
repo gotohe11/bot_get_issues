@@ -36,7 +36,10 @@ def main():
             bot.send_message(message.chat.id, result)
         elif isinstance(result, list):
             for item in result:
-                bot.send_message(message.chat.id, ', '.join(str(i) for i in item))
+                if isinstance(item, str):
+                    bot.send_message(message.chat.id, f'<b>{item}</b>', parse_mode='HTML')
+                else:
+                    bot.send_message(message.chat.id, ', '.join(str(i) for i in item))
 
 
 
