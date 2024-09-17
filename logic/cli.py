@@ -71,7 +71,7 @@ def get_command(project_name):
     global USER
 
     if not USER:
-        USER = users.User(None)
+        raise errors.IncorrectOder('Firstly, try </start> command.')
 
     issues_list = _get_issues_list_from_github(project_name)
     if issues_list:
@@ -146,17 +146,14 @@ def next_command():
         return issues_list[num_1:num_2]
 
 
-@dec_command('login',
-             'login or create new account (user_name is case-insensitive), '
-             'format: login <user_name>;')
-def login_command(user_name=None):   # имя получилось нечувств к регистру
-    if not user_name:
-        raise errors.CommandArgsError('You should text your login-name first.')
+# @dec_command('login',
+#              'login or create new account (user_name is case-insensitive), '
+#              'format: login <user_name>;')
+def login_command(user_name, user_id):   # имя получилось нечувств к регистру
     global USER
-    USER = DB.load_or_create_user(user_name)
+    USER = DB.load_or_create_user(user_name, user_id)
     msg = f'Hello, {USER.name}!'
     print(msg)
-    return msg
 
 
 @dec_command('sub',
@@ -164,7 +161,7 @@ def login_command(user_name=None):   # имя получилось нечувс�
               'format: sub <owner>/<repo>;')
 def sub_command(project_name=None):
     global USER
-    if not USER or not USER.name:
+    if not USER or not USER.user_id:
         raise errors.IncorrectOder('To subscribe a project, you first need to log in. '
                                    'Try </login> command.')
     if not project_name:
@@ -196,7 +193,7 @@ def sub_command(project_name=None):
              'format: unsub <owner>/<repo>;')
 def unsub_command(project_name=None):
     global USER
-    if not USER or not USER.name:
+    if not USER or not USER.user_id:
         raise errors.IncorrectOder('To unsubscribe from a project, you first need to log in. '
                                    'Try </login> command.')
     if not project_name:
@@ -220,7 +217,7 @@ def update_command(since_date=None):
     Prints new issues since {since_date} or since last time visit (last_issue_num)
     """
     global USER
-    if not USER or not USER.name:
+    if not USER or not USER.user_id:
         raise errors.IncorrectOder('To update your projects, you first need to log in. '
                                    'Try </login> command.')
     if not USER.subs:
@@ -283,12 +280,14 @@ def update_command(since_date=None):
 @dec_command('status', 'prints info about current user;')
 def status_command():
     global USER
-    if not USER or not USER.name:
+    if not USER or not USER.user_id:
         raise errors.IncorrectOder('To get your user status, you first need to log in. '
                                    'Try </login> command.')
     subs_list = []
     if USER.subs:
-        print(f'{USER.name}, you have {len(USER.subs)} subscription(s):')
+        msg = f'{USER.name}, you have {len(USER.subs)} subscription(s):'
+        print(msg)
+        subs_list.append(msg)
         for i, sub in enumerate(USER.subs.values(), 1):
             temp = (i, sub.name, f'{len(sub.issues_list)} issues', f'last time read issue - {sub.last_issue_num}')
             subs_list.append(temp)

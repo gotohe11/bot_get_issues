@@ -12,21 +12,25 @@ bot = telebot.TeleBot(API_TOKEN)
 def main():
     @bot.message_handler(commands = ['start'])
     def start_cmd(message):
-      bot.send_message(message.chat.id, 'Hi! I am a bot that brings issues from github by your request.\n'
-                                        'Use </help> command to understand what can i do.')
+        cli.login_command(message.from_user.first_name, str(message.from_user.id))
+        bot.send_message(message.chat.id, f'Hi, {message.from_user.first_name}! '
+                                          f'I am a bot that brings issues from github by your request.\n'
+                                          f'Use </help> command to understand what can i do.')
 
 
     @bot.message_handler(commands=['exit', 'stop'])
     def exit_cmd(message):
-        bot.send_message(message.chat.id, 'Bye-bye!')
+        bot.send_message(message.chat.id, f'Bye-bye, {message.from_user.first_name}!')
         bot.stop_polling()
 
 
     @bot.message_handler(content_types=['text'])
     def handler_cmd(message):
+        if not cli.USER:
+            cli.login_command(message.from_user.first_name, str(message.from_user.id))
+
         try:
             result = cli._run_one(message.text)
-
         except Exception as er:
             print(er)
             bot.send_message(message.chat.id, f'Something went wrong: "{er}".\n'
@@ -39,7 +43,7 @@ def main():
                 if isinstance(item, str):
                     bot.send_message(message.chat.id, f'<b>{item}</b>', parse_mode='HTML')
                 else:
-                    bot.send_message(message.chat.id, ', '.join(str(i) for i in item))
+                    bot.send_message(message.chat.id, ' • '.join(str(i) for i in item))
 
 
 

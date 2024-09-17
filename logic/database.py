@@ -10,7 +10,7 @@ class Database:
         self.path = path
 
 
-    def load_or_create_user(self, user_name):
+    def load_or_create_user(self, name, user_id):
         try:
             with open(self.path, 'r', encoding='utf-8') as file:
                 data = json.load(file)
@@ -18,10 +18,10 @@ class Database:
             with open(self.path, 'w', encoding='utf-8') as file:
                 data = {}
                 json.dump(data, file, indent=2)
-        if data and user_name in data:
-            user = users.User.from_dict(data[user_name])
+        if data and user_id in data:
+            user = users.User.from_dict(data[user_id])
         else:
-            user = users.User(user_name)
+            user = users.User(name, user_id)
             Database.save_user(self, user)
         return user
 
@@ -30,7 +30,7 @@ class Database:
     def save_user(self, user):
         with open(self.path, 'r+', encoding='utf-8') as file:
             data = json.load(file)
-            data[user.name] = user.__dict__
+            data[user.user_id] = user.__dict__
             file.seek(0)
             json.dump(data, file, indent=2)
             file.truncate()
@@ -40,7 +40,7 @@ class Database:
     def save_sub(self, user):     # перезаписываем все подписки юзера
         with open(self.path, 'r+', encoding='utf-8') as file:
             data = json.load(file)
-            data[user.name]['subs'] = {k: v.__dict__ for k, v in user.subs.items()}
+            data[user.user_id]['subs'] = {k: v.__dict__ for k, v in user.subs.items()}
             file.seek(0)
             json.dump(data, file, indent=2)
             file.truncate()
