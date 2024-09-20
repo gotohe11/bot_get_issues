@@ -1,5 +1,6 @@
 import telebot
 from environs import Env
+from threading import Timer
 from logic import cli
 
 
@@ -9,10 +10,36 @@ API_TOKEN = env('API_TOKEN')
 bot = telebot.TeleBot(API_TOKEN)
 
 
+def bot_print_func(id, obj):
+    if isinstance(obj, str):
+        bot.send_message(id, f'<b>{obj}</b>', parse_mode='HTML')
+    elif isinstance(obj, tuple):
+        bot.send_message(id, ' • '.join(str(i) for i in obj))
+    elif isinstance(obj, list):
+        for item in obj:
+            bot_print_func(id, item)
+    else:
+        print('print mistake')
+
+
+def bot_check_updates():
+    for id in cli.users_command():
+        user = cli.login_command(id)
+        result = cli.check_updates(user)
+        if result:    # посылать уведомление пользователю
+            bot_print_func(id, result)
+
+
+def repeater(interval, function):
+    Timer(interval, repeater, [interval, function]).start()
+    function()
+
+
+
 def main():
     @bot.message_handler(commands = ['start'])
     def start_cmd(message):
-        cli.login_command(message.from_user.first_name, str(message.from_user.id))
+        cli.login_command(str(message.from_user.id), message.from_user.first_name)
         bot.send_message(message.chat.id, f'Hi, {message.from_user.first_name}! '
                                           f'I am a bot that brings issues from github by your request.\n'
                                           f'Use </help> command to understand what can i do.')
@@ -27,8 +54,7 @@ def main():
     @bot.message_handler(content_types=['text'])
     def handler_cmd(message):
         if not cli.USER:
-            cli.login_command(message.from_user.first_name, str(message.from_user.id))
-
+            cli.login_command(str(message.from_user.id), message.from_user.first_name)
         try:
             result = cli._run_one(message.text)
         except Exception as er:
@@ -38,15 +64,11 @@ def main():
             return
         if isinstance(result, str):
             bot.send_message(message.chat.id, result)
-        elif isinstance(result, list):
-            for item in result:
-                if isinstance(item, str):
-                    bot.send_message(message.chat.id, f'<b>{item}</b>', parse_mode='HTML')
-                else:
-                    bot.send_message(message.chat.id, ' • '.join(str(i) for i in item))
+        else:
+            bot_print_func(message.chat.id, result)
 
 
-
+    repeater(600, bot_check_updates)     # повторение каждые 10мин и при загрузке
 
     bot.polling(none_stop = True)
 

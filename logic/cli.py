@@ -70,9 +70,6 @@ def _get_issues_list_from_github(project_name):
 def get_command(project_name):
     global USER
 
-    if not USER:
-        raise errors.IncorrectOder('Firstly, try </start> command.')
-
     issues_list = _get_issues_list_from_github(project_name)
     if issues_list:
         USER.last_project = subscriptions.Subscription(project_name, issues_list, 0)
@@ -90,7 +87,7 @@ def get_command(project_name):
              'format: print <N>;')
 def print_command(issue_number=None):
     global USER
-    if not USER or not USER.last_project:
+    if not USER.last_project:
         raise errors.IncorrectOder('Firstly, try "/get <owner>/<repo>" command.')
 
     issues_list = USER.last_project.issues_list
@@ -125,7 +122,7 @@ def print_command(issue_number=None):
              'prints the next 10 issues or the remainder;')
 def next_command():
     global USER
-    if not USER or not USER.last_project:
+    if not USER.last_project:
         raise errors.IncorrectOder('Firstly, try "/get <owner>/<repo>" command.')
 
     issues_list = USER.last_project.issues_list
@@ -146,14 +143,13 @@ def next_command():
         return issues_list[num_1:num_2]
 
 
-# @dec_command('login',
-#              'login or create new account (user_name is case-insensitive), '
-#              'format: login <user_name>;')
-def login_command(user_name, user_id):   # имя получилось нечувств к регистру
+
+def login_command(user_id, user_name=None):   # имя получилось нечувств к регистру
     global USER
-    USER = DB.load_or_create_user(user_name, user_id)
+    USER = DB.load_or_create_user(user_id, user_name)
     msg = f'Hello, {USER.name}!'
     print(msg)
+    return USER
 
 
 @dec_command('sub',
@@ -161,9 +157,7 @@ def login_command(user_name, user_id):   # имя получилось нечу�
               'format: sub <owner>/<repo>;')
 def sub_command(project_name=None):
     global USER
-    if not USER or not USER.user_id:
-        raise errors.IncorrectOder('To subscribe a project, you first need to log in. '
-                                   'Try </login> command.')
+
     if not project_name:
         raise errors.CommandArgsError('You forgot to text a project name.')
 
@@ -193,9 +187,7 @@ def sub_command(project_name=None):
              'format: unsub <owner>/<repo>;')
 def unsub_command(project_name=None):
     global USER
-    if not USER or not USER.user_id:
-        raise errors.IncorrectOder('To unsubscribe from a project, you first need to log in. '
-                                   'Try </login> command.')
+
     if not project_name:
         raise errors.CommandArgsError('You forgot to text a project name.')
 
@@ -209,6 +201,42 @@ def unsub_command(project_name=None):
         return er.args[0]
 
 
+
+def _update_one_sub(subscription, since_date=None):
+    result_list = []
+    temp_list_issues = _get_issues_list_from_github(subscription.name)  # заново грузим весь репозиторий
+    if not temp_list_issues:
+        raise github.GithubError
+
+    if not since_date:  # догружаем у каждой подписки все исусы, которые еще не видел юзер
+        if subscription.last_issue_num < len(temp_list_issues):  # сравниваем с последним просмотренным исусом
+            print(subscription.name + ' repository:')
+            result_list.append(subscription.name + ' repository:')
+            pretty_print_issues(temp_list_issues, subscription.last_issue_num, len(temp_list_issues))
+            result_list.extend(temp_list_issues[subscription.last_issue_num:len(temp_list_issues)])
+            subscription.issues_list = temp_list_issues
+            subscription.last_issue_num = len(temp_list_issues)
+
+    else:    # if since_date
+        numbers_new_issues_list = []  # собираем все номера непросмотренных исусов подписки для печати
+        for issue in temp_list_issues:
+            # issue[2] = issue's created_at data
+            if date.fromisoformat(issue[2]) > date.fromisoformat(since_date):
+                numbers_new_issues_list.append(issue[0])  # issue[0] = issue's N
+            else:
+                break
+        if numbers_new_issues_list:
+            print(subscription.name + ' repository:')
+            result_list.append(subscription.name + ' repository:')
+            pretty_print_issues(temp_list_issues, numbers_new_issues_list[0] - 1, numbers_new_issues_list[-1])
+            result_list.extend(temp_list_issues[numbers_new_issues_list[0] - 1:numbers_new_issues_list[-1]])
+            subscription.issues_list = temp_list_issues
+            subscription.last_issue_num = numbers_new_issues_list[-1]
+
+    return result_list
+
+
+
 @dec_command('update',
              'prints issues in all projects you subscribe since the last visit'
              'or date, format: update <date>;')
@@ -217,72 +245,52 @@ def update_command(since_date=None):
     Prints new issues since {since_date} or since last time visit (last_issue_num)
     """
     global USER
-    if not USER or not USER.user_id:
-        raise errors.IncorrectOder('To update your projects, you first need to log in. '
-                                   'Try </login> command.')
     if not USER.subs:
         msg = 'You do not have any subscriptions yet.'
         print(msg)
         return msg
 
-    elif USER.subs and not since_date:    # догружаем у каждой подписки все исусы, которые еще не видел юзер
-        total_list = []
-        for subs_name, subscription in USER.subs.items():
-            temp_list_issues = _get_issues_list_from_github(subscription.name)  # заново грузим весь репозиторий
-            if not temp_list_issues:
-                raise github.GithubError
-            if subscription.last_issue_num < len(temp_list_issues):    # сравниваем с последним просмотренным исусом
-                print(subscription.name + ' repository:')
-                total_list.append(subscription.name + ' repository:')
-                pretty_print_issues(temp_list_issues, subscription.last_issue_num, len(temp_list_issues))
-                total_list.extend(temp_list_issues[subscription.last_issue_num:len(temp_list_issues)])
-                subscription.issues_list = temp_list_issues
-                subscription.last_issue_num = len(temp_list_issues)
-                DB.save_sub(USER)
-            else:
-                msg = f'There is nothing to update in "{subscription.name}" repository.'
-                print(msg)
-                total_list.append(msg)
-        return total_list
-
-
-    elif USER.subs and since_date:   # догружаем у каждой подписки все исусы позже указанной даты
-        total_list = []
+    if since_date:
         try:
             date.fromisoformat(since_date)
         except ValueError as er:
-            print('Invalid isoformat string. Try again.')
-            return er.args[0]
-        for subs_name, subscription in USER.subs.items():
-            temp_list_issues = _get_issues_list_from_github(subscription.name)  # заново грузим весь репозиторий
-            if not temp_list_issues:
-                raise github.GithubError
-            numbers_new_issues_list = []    # собираем все номера непросмотренных исусов подписки для печати
-            for issue in temp_list_issues:
-                # issue[2] = issue's created_at data
-                if date.fromisoformat(issue[2]) >= date.fromisoformat(since_date):
-                    numbers_new_issues_list.append(issue[0])    # issue[0] = issue's N
-                    subscription.last_issue_num = issue[0]
-            if numbers_new_issues_list:
-                print(subscription.name + ' repository:')
-                total_list.append(subscription.name + ' repository:')
-                pretty_print_issues(temp_list_issues, numbers_new_issues_list[0]-1, numbers_new_issues_list[-1])
-                total_list.extend(temp_list_issues[numbers_new_issues_list[0] - 1:numbers_new_issues_list[-1]])
-                DB.save_sub(USER)
-            else:
-                msg = f'There is nothing to update in "{subscription.name}" repository.'
-                print(msg)
-                total_list.append(msg)
-        return total_list
+            msg = 'Invalid isoformat string for date. Try again.'
+            print(msg)
+            return msg
+
+    result = []
+    for sub_name, subscription in USER.subs.items():
+        temp = _update_one_sub(subscription, since_date)
+        if temp:
+            result.append(temp)
+        else:
+            msg = f'There is nothing to update in "{subscription.name}" repository.'
+            print(msg)
+            result.append(msg)
+
+    DB.save_sub(USER)
+    return result
+
+
+
+def check_updates(user):
+        if user.subs:
+            new_issues_list = []
+            for subs_name, subscription in user.subs.items():
+                last_issue_date = subscription.issues_list[0][2]    # берем дату самого нового исуса у подписки
+                print(f'check {subscription.name} updates')
+                result = _update_one_sub(subscription, last_issue_date)
+                new_issues_list.extend(result)
+                DB.save_sub(user)
+
+            return new_issues_list
 
 
 
 @dec_command('status', 'prints info about current user;')
 def status_command():
     global USER
-    if not USER or not USER.user_id:
-        raise errors.IncorrectOder('To get your user status, you first need to log in. '
-                                   'Try </login> command.')
+
     subs_list = []
     if USER.subs:
         msg = f'{USER.name}, you have {len(USER.subs)} subscription(s):'
@@ -306,11 +314,12 @@ def users_command():
         with open(DB.path, 'r', encoding='utf-8') as file:
             data = json.load(file)
     except FileNotFoundError as er:
-        print('No users yet.')
-        return None
+        msg = 'No users yet.'
+        print(msg)
+        return msg
     print('Registered users:')
     print(*data.keys(), sep=', ')
-    return ', '.join(data.keys())
+    return list(data.keys())
 
 
 def ask_user():

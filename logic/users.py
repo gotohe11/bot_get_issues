@@ -4,8 +4,8 @@ from . import subscriptions
 
 @dataclass
 class User:
-    name: str
     user_id: str
+    name: str = field(default=None)
     subs: dict = field(default_factory=dict)
     last_project: subscriptions.Subscription = field(default=None)    # последний просмотренный проект без подписки
 
@@ -25,11 +25,11 @@ class User:
 
     @classmethod
     def from_dict(cls, dct):
-        name = dct['name']
         user_id = dct['user_id']
+        name = dct['name']
         subs = {
             k: subscriptions.Subscription.from_dict(v)
             for k, v in dct['subs'].items()
         }
-        return cls(name, user_id, subs)    # без посл просм проекта
+        return cls(user_id, name, subs)    # без посл просм проекта
 
