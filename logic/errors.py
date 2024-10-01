@@ -17,7 +17,7 @@ class CommandArgsError(CommandError):
 
 
 class IncorrectOder(CommandError):
-    """ Была введена команда печати до получения списка тикетов """
+    """ Была введена команда в неверной последовательности"""
 
     def __repr__(self):
         return 'Firstly, try the command "/get <owner>/<repo>".'

@@ -1,0 +1,38 @@
+version: 1
+disable_existing_loggers: True
+
+formatters:
+  default:
+    format: '[%(asctime)s] #%(levelname)-8s %(filename)s:%(lineno)d - %(name)s:%(funcName)s - %(message)s'
+
+handlers:
+  default:
+    class: logging.StreamHandler
+    formatter: default
+    level: ERROR
+
+  stdout:
+    class: logging.StreamHandler
+    formatter: default
+    level: INFO
+    stream: ext://sys.stdout
+
+  error_file:
+    class: logging.FileHandler
+    filename: bot_errors.log
+    mode: w
+    level: INFO
+    formatter: default
+
+loggers:
+  run_bot:
+    level: INFO
+    handlers: [stdout, error_file]
+
+  logic.cli:
+    level: INFO
+    handlers: [stdout, error_file]
+
+root:
+  formatter: default
+  handlers: [default]
