@@ -1,31 +1,40 @@
-import sys
-from tabulate import tabulate
-from datetime import date
+"""Осуществляет главную логику программы.
+Здесь прописаны все функции для исполнения команд тг-бота.
+"""
+
 import functools
 import json
+import logging
+from collections.abc import Callable
+from datetime import date
+from typing import Any
 
-from . import errors, github, users, subscriptions, database
 
-DB = database.Database()   # класс ДБ, путь сохранение - по умолчанию
-USER = None    # несет экземпляр класса юзер
+from . import errors
+from . import database
+from . import github
+from logic.subscriptions import Subscription
+from logic.users import User
+
+
+logger = logging.getLogger(__name__)
+
+DB = database.Database()  # класс ДБ, путь сохранение - по умолчанию
+USER = None  # несет экземпляр класса юзер
 
 INFO = []
 COMMANDS = {}
 
 
-def pretty_print_issues(res_list, num_start, num_finish=100):
+def dec_command(cmd_name: str, help_info: str) -> Callable[[str], Any]:
+    """Декорирует функции-команды тг-бота.
+    Автоматически добавляет команду и соответсвующую ей
+    ф-ию в словарь COMMANDS для вызова и информацию
+    о командах в INFO.
+    :param cmd_name: команда тг-бота.
+    :param help_info: информация о команде для пользователя.
+    :return: Декорируемую ф-ию.
     """
-    Prints a list of issues sorted by creation date (by default),
-    in the form of a table.
-    :param num_start: required number of issues
-    :param num_finish: required number of issues
-    :return: data table
-    """
-    columns = ['N', 'title', 'created_at', 'updated_at', 'comments']
-    print(tabulate(res_list[num_start:num_finish], headers=columns))
-
-
-def dec_command(cmd_name, help_info):
     def decorator(func):
         INFO.append(('/' + cmd_name, help_info))
         COMMANDS['/' + cmd_name] = func
@@ -38,63 +47,84 @@ def dec_command(cmd_name, help_info):
 
 
 @dec_command('help',   'commands info;')
-def help_command():
+def help_command() -> str:
+    """Команда тг-бота с информацией о других командах для пользователя.
+    """
     res = ['Available commands:'] + [' - '.join(item) for item in INFO]
-    print(*res, sep='\n')
     return '\n'.join(res)
 
 
-@dec_command('exit',  'exit;')
-def exit_command():
-    sys.exit()
-
-
-def _get_issues_list_from_github(project_name):
+def _get_issues_list_from_github(project_name: str) -> list[tuple[int | str]]:
+    """Загружает с github список исусов репозитория.
+    :param project_name: имя репозитория.
+    :raises ProjectNotFoundError: 404, репозиторий
+        не был найден.
+    :raises GithubError: ошибка подключения к github.
+    :return: Пронумерованный список исусов репозитория
+        с датами создания/обновления и количеством
+        комментариев.
+    """
     success = False
     while not success:
         try:
             issues_list = github.make_issues_list(project_name)
         except github.ProjectNotFoundError:
-            print(f'Project "{project_name}" not found, check your spelling.')
+            logging.exception(f'Project "{project_name}" not found, check your spelling.')
             res_list = []
             break
         except github.GithubError as err:
-            print(f'Error communicating with Github: {err}')
+            logging.exception(f'Error communicating with Github: {err}')
             break
         success = True
         return issues_list
 
 
-@dec_command('get', 'gets repo issues list and prints the amount of them, '
-             'format: get <owner>/<repo> (for example, "get gotohe11/get_issue");')
-def get_command(project_name):
+@dec_command('get', (
+        'gets repo issues list and prints the amount of them, '
+        'format: get <owner>/<repo> (for example, "get gotohe11/get_issue");'
+))
+def get_command(project_name: str) -> str:
+    """Команда тг-бота /get.
+    Загружает список исусов репозитория с github,
+    добавляет данный список в последний просмотренный
+    (текущий) для дальнейших операций над ним.
+    :param project_name: имя репозитория.
+    :return: Сообщения о подгруженном репозитории
+        или ошибке.
+    """
     global USER
-
-    if not USER:
-        raise errors.IncorrectOder('Firstly, try </start> command.')
 
     issues_list = _get_issues_list_from_github(project_name)
     if issues_list:
-        USER.last_project = subscriptions.Subscription(project_name, issues_list, 0)
+        USER.last_project = Subscription(project_name, issues_list, 0)
         msg = (f'There are {len(issues_list)} issues in the "{project_name}" repository.'
                f' Use /sub, /next or /print commands.')
-        print(msg)
         return msg
     else:
         return f'Project "{project_name}" not found, check your spelling.'
 
 
-
-@dec_command('print',
-             'prints the N-th issue (if there is no N, prints 10 newest issues), '
-             'format: print <N>;')
-def print_command(issue_number=None):
+@dec_command('print', (
+        'prints the N-th issue (if there is no N, '
+        'prints 10 newest issues), format: print <N>;'
+))
+def print_command(issue_number: int = None) -> list[tuple[int | str]]:
+    """Команда тг-бота /print.
+    Печатает указанный номер исуса текущего репозитория
+    пользователя (USER.last_project) или первые
+    10 исусов.
+    :param issue_number: номер исуса для печати.
+    :raises IncorrectOder: ошибка пользователя при
+        неверной последовательности ввода команд.
+    :raises CommandArgsError: ошибка пользователя при
+        введении неверных аргументов с тг-командой.
+    :return: Список исусов на печать.
+    """
     global USER
-    if not USER or not USER.last_project:
+    if not USER.last_project:
         raise errors.IncorrectOder('Firstly, try "/get <owner>/<repo>" command.')
 
     issues_list = USER.last_project.issues_list
-
     if issue_number is None:
         # prints first 10, if no args
         limit = 10
@@ -109,23 +139,31 @@ def print_command(issue_number=None):
         if skip >= len(issues_list) or skip < 0:
             raise errors.CommandArgsError('Number out of issues list range.')
 
-    pretty_print_issues(issues_list, skip, skip+limit)   # печатаем
-    USER.last_project.read_issues(skip+limit)  # замена последнего просмотренного исуса текущего проекта
-
-    # замена последнего просмотренного исуса проекта если он в подписках у пользователя
+    # замена последнего просмотренного исуса текущего проекта
+    USER.last_project.read_issues(skip+limit)
     project_name = USER.last_project.name
-    if project_name in USER.subs:    # если юзер подписан на репо, то меняем последний просмотренный исус
+    # если юзер подписан на репо, то меняем последний просмотренный исус
+    if project_name in USER.subs:
         USER.subs[project_name].read_issues(skip+limit)
-        DB.save_sub(USER)     # записываем в файлик
+        DB.save_sub(USER)  # записываем в файлик
 
     return issues_list[skip:skip+limit]
 
 
 @dec_command('next',
              'prints the next 10 issues or the remainder;')
-def next_command():
+def next_command() -> list[tuple[int | str]]:
+    """Команда тг-бота /next.
+    Печатает последующие 10 исусов текущего
+    репозитория пользователя (USER.last_project).
+    :raises IncorrectOder: ошибка пользователя при
+        неверной последовательности ввода команд.
+    :raises CommandArgsError: ошибка пользователя при введении
+        команды, когда все исусы уже просмотрены.
+    :return: Список исусов на печать.
+    """
     global USER
-    if not USER or not USER.last_project:
+    if not USER.last_project:
         raise errors.IncorrectOder('Firstly, try "/get <owner>/<repo>" command.')
 
     issues_list = USER.last_project.issues_list
@@ -134,191 +172,258 @@ def next_command():
     if num_1 < 0 or num_1 >= len(issues_list):
         raise errors.CommandArgsError('You have seen the whole issues list.')
     else:
-        pretty_print_issues(issues_list, num_1, num_2)
-        USER.last_project.read_issues(num_2)    # замена последнего просмотренного исуса текущего проекта
-
-        # замена последнего просмотренного исуса проекта если он в подписках у пользователя
+        # замена последнего просмотренного исуса текущего проекта
+        USER.last_project.read_issues(num_2)
         project_name = USER.last_project.name
-        if project_name in USER.subs:  # если юзер подписан на репо, то меняем последний просмотренный исус
+        # если юзер подписан на репо, то меняем последний просмотренный исус
+        if project_name in USER.subs:
                 USER.subs[project_name].read_issues(num_2)
                 DB.save_sub(USER)  # записываем в файлик
-
         return issues_list[num_1:num_2]
 
 
-# @dec_command('login',
-#              'login or create new account (user_name is case-insensitive), '
-#              'format: login <user_name>;')
-def login_command(user_name, user_id):   # имя получилось нечувств к регистру
+# имя получилось нечувств к регистру
+def login_command(user_id: str, user_name: str = None) -> User:
+    """Регистрация/авторизация пользователя.
+    Регистрирует нового пользователя в БД
+    или загружает информацию о существующем.
+    :param user_id: id пользователя тг.
+    :param user_name: first_name пользователя тг.
+    :return: Экземпляр класса User.
+    """
     global USER
-    USER = DB.load_or_create_user(user_name, user_id)
-    msg = f'Hello, {USER.name}!'
-    print(msg)
+    USER = DB.load_or_create_user(user_id, user_name)
+    logger.info(f'Login {USER.name}.')
+    return USER
 
 
 @dec_command('sub',
-              'to subscribe to the project, '
-              'format: sub <owner>/<repo>;')
-def sub_command(project_name=None):
+             'to subscribe to the project, format: sub <owner>/<repo>;')
+def sub_command(project_name: str = None) -> str:
+    """Команда тг-бота /sub.
+    Подписывает пользователя на репозиторий.
+    :raises CommandArgsError: ошибка пользователя при введении
+        команды.
+    :raises GithubError: ошибка загрузки исусов с github.
+    :return: Сообщение об удачно выполненной подписке на
+        репозиторий или об ошибке в процессе.
+    """
     global USER
-    if not USER or not USER.user_id:
-        raise errors.IncorrectOder('To subscribe a project, you first need to log in. '
-                                   'Try </login> command.')
     if not project_name:
         raise errors.CommandArgsError('You forgot to text a project name.')
 
     if USER.last_project and project_name == USER.last_project.name:
         project_obj = USER.last_project
     else:
-        try:    # создаем подписку
-            issues_list = _get_issues_list_from_github(project_name)    # заново грузим исусы
+        try:  # создаем подписку
+            issues_list = _get_issues_list_from_github(project_name)  # заново грузим исусы
             if not issues_list:
                 raise github.GithubError
-            project_obj = subscriptions.Subscription(project_name, issues_list, 0)
+            project_obj = Subscription(project_name, issues_list, 0)
         except github.GithubError:
             raise github.GithubError('Some problem with GitHub.')
+
     try:
         USER.add_subsc(project_obj)
         DB.save_sub(USER)  # просто переписываем весь список подписок юзера заново
         msg = f'{USER.name}, you subscribed to "{project_name}" repository.'
-        print(msg)
+        logger.info(msg)
         return msg
     except NameError as er:
+        logger.exception(er.args[0])
         return er.args[0]
 
 
-
 @dec_command('unsub',
-             'to unsubscribe from the project, '
-             'format: unsub <owner>/<repo>;')
-def unsub_command(project_name=None):
+             'to unsubscribe from the project, format: unsub <owner>/<repo>;')
+def unsub_command(project_name: str = None) -> str:
+    """Команда тг-бота /unsub.
+    Отписывает пользователя от репозитория.
+    :param project_name: имя репозитория.
+    :raises CommandArgsError: ошибка пользователя при введении
+        команды.
+    :return: Сообщение об удачно выполненной операции
+        или об ошибке в процессе.
+    """
     global USER
-    if not USER or not USER.user_id:
-        raise errors.IncorrectOder('To unsubscribe from a project, you first need to log in. '
-                                   'Try </login> command.')
     if not project_name:
         raise errors.CommandArgsError('You forgot to text a project name.')
 
     try:
-        USER.remove_subsc(project_name)    # удаляем ненужную подписку из списка подписок юзера
-        DB.save_sub(USER)   # просто переписываем весь список подписок Юзера заново
+        USER.remove_subsc(project_name)  # удаляем ненужную подписку из списка подписок юзера
+        DB.save_sub(USER)  # просто переписываем весь список подписок юзера заново
         msg = f'{USER.name}, you unsubscribed from the "{project_name}" repository.'
-        print(msg)
+        logger.info(msg)
         return msg
     except NameError as er:
+        logger.exception(er.args[0])
         return er.args[0]
 
 
-@dec_command('update',
-             'prints issues in all projects you subscribe since the last visit'
-             'or date, format: update <date>;')
-def update_command(since_date=None):
+def _update_one_sub(subscription: Subscription, since_date: str = None) -> list[Any]:
+    """Обновляет подписку.
+    Обновляет данные переданного экземпляра
+    класса Subscription с указанной даты
+    или с последнего просмотренного исуса.
+    :param subscription: экз.класса Subscription.
+    :param since_date: дата, с которой пользователь
+        хочет обновить исусы подписки.
+    :raises GithubError: ошибка загрузки исусов с github.
+    :return: Список новых исусов подписки с
+        заголовком или пустой список.
     """
-    Prints new issues since {since_date} or since last time visit (last_issue_num)
+    result_list = []
+    temp_list_issues = _get_issues_list_from_github(subscription.name)  # заново грузим весь репозиторий
+    if not temp_list_issues:
+        raise github.GithubError
+
+    start_num = new_last_num = None
+    if since_date:
+        # собираем номера непросмотренных исусов подписки для печати
+        numbers_new_issues_list = []
+        for issue in temp_list_issues:
+            # issue[2] = issue's created_at data
+            if date.fromisoformat(issue[2]) > date.fromisoformat(since_date):
+                numbers_new_issues_list.append(issue[0])  # issue[0] = issue's N
+            else:
+                break
+        if numbers_new_issues_list:
+            start_num = numbers_new_issues_list[0] - 1
+            new_last_num = numbers_new_issues_list[-1]
+
+    else:  # if not since_date
+        # сравниваем с последним просмотренным исусом
+        if subscription.last_issue_num < len(temp_list_issues):
+            start_num = subscription.last_issue_num
+            new_last_num = len(temp_list_issues)
+
+    if new_last_num:
+        result_list.append(subscription.name + ' repository:')
+        result_list.extend(temp_list_issues[start_num:new_last_num])
+        subscription.issues_list = temp_list_issues
+        subscription.last_issue_num = new_last_num
+
+    return result_list
+
+
+@dec_command('update', (
+        'prints issues in all projects you subscribe '
+        'since the last visit or date, format: update <date>;'
+))
+def update_command(since_date: str = None) -> list[Any] | str:
+    """Команда тг-бота /update.
+    Обновляет данные подписок у пользователя
+    с указанной даты или с последнего
+    просмотренного исуса.
+    :param since_date: дата, с которой пользователь
+        хочет обновить исусы подписок.
+    :raises ValueError: ошибка пользователя при вводе
+        даты обновления.
+    :return: Список новых исусов подписок с
+        заголовками или пустой список,
+        или строка с сообщением.
     """
     global USER
-    if not USER or not USER.user_id:
-        raise errors.IncorrectOder('To update your projects, you first need to log in. '
-                                   'Try </login> command.')
     if not USER.subs:
         msg = 'You do not have any subscriptions yet.'
-        print(msg)
+        logger.info(msg)
         return msg
 
-    elif USER.subs and not since_date:    # догружаем у каждой подписки все исусы, которые еще не видел юзер
-        total_list = []
-        for subs_name, subscription in USER.subs.items():
-            temp_list_issues = _get_issues_list_from_github(subscription.name)  # заново грузим весь репозиторий
-            if not temp_list_issues:
-                raise github.GithubError
-            if subscription.last_issue_num < len(temp_list_issues):    # сравниваем с последним просмотренным исусом
-                print(subscription.name + ' repository:')
-                total_list.append(subscription.name + ' repository:')
-                pretty_print_issues(temp_list_issues, subscription.last_issue_num, len(temp_list_issues))
-                total_list.extend(temp_list_issues[subscription.last_issue_num:len(temp_list_issues)])
-                subscription.issues_list = temp_list_issues
-                subscription.last_issue_num = len(temp_list_issues)
-                DB.save_sub(USER)
-            else:
-                msg = f'There is nothing to update in "{subscription.name}" repository.'
-                print(msg)
-                total_list.append(msg)
-        return total_list
-
-
-    elif USER.subs and since_date:   # догружаем у каждой подписки все исусы позже указанной даты
-        total_list = []
+    if since_date:
         try:
             date.fromisoformat(since_date)
         except ValueError as er:
-            print('Invalid isoformat string. Try again.')
-            return er.args[0]
-        for subs_name, subscription in USER.subs.items():
-            temp_list_issues = _get_issues_list_from_github(subscription.name)  # заново грузим весь репозиторий
-            if not temp_list_issues:
-                raise github.GithubError
-            numbers_new_issues_list = []    # собираем все номера непросмотренных исусов подписки для печати
-            for issue in temp_list_issues:
-                # issue[2] = issue's created_at data
-                if date.fromisoformat(issue[2]) >= date.fromisoformat(since_date):
-                    numbers_new_issues_list.append(issue[0])    # issue[0] = issue's N
-                    subscription.last_issue_num = issue[0]
-            if numbers_new_issues_list:
-                print(subscription.name + ' repository:')
-                total_list.append(subscription.name + ' repository:')
-                pretty_print_issues(temp_list_issues, numbers_new_issues_list[0]-1, numbers_new_issues_list[-1])
-                total_list.extend(temp_list_issues[numbers_new_issues_list[0] - 1:numbers_new_issues_list[-1]])
-                DB.save_sub(USER)
-            else:
-                msg = f'There is nothing to update in "{subscription.name}" repository.'
-                print(msg)
-                total_list.append(msg)
-        return total_list
+            msg = 'Invalid isoformat string for date. Try again.'
+            logger.exception(msg)
+            return msg
+
+    result = []
+    for sub_name, subscription in USER.subs.items():
+        temp = _update_one_sub(subscription, since_date)
+        if temp:
+            result.append(temp)
+        else:
+            msg = f'There is nothing to update in "{subscription.name}" repository.'
+            logger.info(msg)
+            result.append(msg)
+
+    DB.save_sub(USER)
+    return result
+
+
+def check_updates(user: User) -> list[Any]:
+    """Проверяет и обновляет подписки пользователя.
+    :param user: экземпляр класса User.
+    :return: Список новых исусов подписок с
+        заголовками или пустой список.
+    """
+    if user.subs:
+        new_issues_list = []
+        for subs_name, subscription in user.subs.items():
+            # берем дату самого нового исуса у подписки
+            last_issue_date = subscription.issues_list[0][2]
+            logger.info(f'Checking {subscription.name} updates')
+            result = _update_one_sub(subscription, last_issue_date)
+            new_issues_list.extend(result)
+            DB.save_sub(user)
+
+        return new_issues_list
 
 
 
 @dec_command('status', 'prints info about current user;')
-def status_command():
+def status_command() -> list[tuple[int | str]]:
+    """Выводит информацию о подписках пользователя.
+    :return: Список с информацией о состоянии
+        подписок пользователя.
+    """
     global USER
-    if not USER or not USER.user_id:
-        raise errors.IncorrectOder('To get your user status, you first need to log in. '
-                                   'Try </login> command.')
     subs_list = []
     if USER.subs:
         msg = f'{USER.name}, you have {len(USER.subs)} subscription(s):'
-        print(msg)
         subs_list.append(msg)
         for i, sub in enumerate(USER.subs.values(), 1):
-            temp = (i, sub.name, f'{len(sub.issues_list)} issues', f'last time read issue - {sub.last_issue_num}')
+            temp = (i, sub.name, f'{len(sub.issues_list)} issues',
+                    f'last time read issue - {sub.last_issue_num}')
             subs_list.append(temp)
-            print(', '.join(str(i) for i in temp))
     else:
         msg = f'{USER.name}, you have no subscriptions yet.'
-        print(msg)
+        logger.info(msg)
         return msg
+
     return subs_list
 
 
 @dec_command('users',
              'prints a list of all registered users.')
-def users_command():
+def users_command() -> list[str] | str:
+    """Выводит инф-ию о зарегистрированных пользователях.
+    :raises: FileNotFoundError: ошибка чтения файла.
+    :return: Список пользователей или сообщение об
+        их отсутствии.
+    """
     try:
         with open(DB.path, 'r', encoding='utf-8') as file:
             data = json.load(file)
     except FileNotFoundError as er:
-        print('No users yet.')
-        return None
-    print('Registered users:')
-    print(*data.keys(), sep=', ')
-    return ', '.join(data.keys())
+        msg = 'No users yet.'
+        logger.exception(msg)
+        return msg
+
+    return list(data.keys())
 
 
-def ask_user():
-    return input('Enter the command '
-                 '(for more information about commands input "/help"): ')
-
-
-def _run_one(command: str):
+def run_one(command: str) -> Callable[[str], Any]:
+    """Обработчик введенных команд.
+    :param command: введенная пользователем
+        команда.
+    :raises CommandNotFound: отсутствует ключ-команда
+        в COMMANDS.
+    :raises CommandArgsError: передача пользователем
+        неверных аргументов с командой.
+    :return: Значение по ключу-команде в
+        словаре COMMANDS.
+    """
     parts = command.lower().split()
     cmd = parts[0]
     if len(parts) > 1:
@@ -332,24 +437,5 @@ def _run_one(command: str):
     try:
         return COMMANDS[cmd](*args)
     except TypeError as er:
-        print(er)
+        logger.exception(er)
         raise errors.CommandArgsError('Wrong number of arguments provided.')
-
-
-def run():
-    """ Запускает пользовательский (консольный) интерфейс приложения.
-    Чтобы "запуск" не был совсем тривиальным, реализуем перезапрос в случае
-    ошибок.
-    """
-    while True:
-        user_command = ask_user()
-        if not user_command:
-            continue
-        try:
-            _run_one(user_command)
-        except errors.CommandError as exc:
-            print(exc)
-
-
-if __name__ == "__main__":
-    run()

@@ -11,7 +11,14 @@ class ProjectNotFoundError(GithubError):
     pass
 
 
-def make_issues_list(project_name):
+def make_issues_list(project_name: str) -> list[tuple[int | str]]:
+    """Ходит на github за исусами.
+    :param project_name: имя репозитория.
+    :raises ProjectNotFoundError: проект не найден.
+    :raises GithubError: другие ошибки подключения
+        к github.
+    :return: Пронумерованный список исусов репозитория.
+    """
     base_url = f'https://api.github.com/repos/{project_name}/issues'
     total_list = []
     page_counter = 1
