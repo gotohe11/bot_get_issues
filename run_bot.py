@@ -1,10 +1,10 @@
 import logging.config
 import telebot
 import yaml
+from collections.abc import Callable
 from environs import Env
 from typing import Any
 from threading import Timer
-
 
 from logic import cli
 
@@ -19,7 +19,7 @@ env.read_env()  # м-м read_env() читаем .env и загружаем пе�
 API_TOKEN = env('API_TOKEN')
 bot = telebot.TeleBot(API_TOKEN)
 
-FLAG_TIMER = True  # выключает threading.Timer в ф-ие repeater
+FLAG_TIMER = True  # переключатель для ф-ии bot_check_updates
 
 
 def bot_print_func(user_id: str, item: Any):
@@ -39,27 +39,26 @@ def bot_print_func(user_id: str, item: Any):
         logger.info('prints mistake')
 
 
-def bot_check_updates():
-    """Проверяет новые исусы у пользователя в подписках.
+def bot_check_updates(repeater_: Callable):
+    """Периодически проверяет новые исусы у пользователя в подписках.
+    :param repeater_: функция-планировщик, выполняющая ф-ию
+        bot_check_updates через определенный промежуток времени.
     """
-    for user_id in cli.users_command():
-        user = cli.login_command(user_id)
-        result = cli.check_updates(user)
-        if result:  # посылать уведомление пользователю
-            bot_print_func(user_id, result)
+    if FLAG_TIMER:  # если юзер еще не ввел команду stop/exit
+        for user_id in cli.users_command():
+            user = cli.login_command(user_id)
+            result = cli.check_updates(user)
+            if result:  # посылать уведомление пользователю
+                bot_print_func(user_id, result)
+        repeater_()
 
 
-def repeater(interval, function):
-    """Запускает ф-ию с заданной периодичностью.
-    :param interval: время в секундах.
-    :param function: функция.
+def repeater():
+    """Запускает ф-ию через заданный период времени.
     """
-    t = Timer(interval, repeater, [interval, function])
-    if FLAG_TIMER:
-        t.start()
-        function()
-    else:
-        t.cancel()
+    # interval=600 - заданный период - 600сек.
+    t = Timer(interval=600, function=bot_check_updates, args=(repeater,))
+    t.start()
 
 
 def main():
@@ -102,8 +101,7 @@ def main():
         else:
             bot_print_func(message.chat.id, result)
 
-
-    repeater(600, bot_check_updates)  # повторение каждые 10мин и при загрузке
+    bot_check_updates(repeater)  # запускаем проверку обновлений подписок юзера
     bot.polling(none_stop=True)
 
 
