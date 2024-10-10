@@ -1,14 +1,12 @@
 """Осуществляет главную логику программы.
 Здесь прописаны все функции для исполнения команд тг-бота.
 """
-
 import functools
 import json
 import logging
 from collections.abc import Callable
 from datetime import date
 from typing import Any
-
 
 from . import errors
 from . import database
@@ -52,6 +50,11 @@ def help_command() -> str:
     """
     res = ['Available commands:'] + [' - '.join(item) for item in INFO]
     return '\n'.join(res)
+
+
+@dec_command('exit',  'exit;')
+def exit_command():
+    pass
 
 
 def _get_issues_list_from_github(project_name: str) -> list[tuple[int | str]]:
