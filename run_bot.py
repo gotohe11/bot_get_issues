@@ -1,17 +1,13 @@
-import logging.config
+import logging
 import telebot
-import yaml
+import threading
 from collections.abc import Callable
 from environs import Env
 from typing import Any
-from threading import Timer
 
 from logic import cli
 
 
-with open('bot_get_issues/logging_config.yaml', 'rt') as f:
-    config = yaml.safe_load(f.read())
-logging.config.dictConfig(config)
 logger = logging.getLogger(__name__)
 
 env = Env()  # создаем экземпляр класса Env
@@ -36,7 +32,7 @@ def bot_print_func(user_id: str, item: Any):
         for i in item:
             bot_print_func(user_id, i)
     else:
-        logger.info('prints mistake')
+        logger.error('Here is an error with printing')
 
 
 def bot_check_updates(repeater_: Callable):
@@ -45,6 +41,7 @@ def bot_check_updates(repeater_: Callable):
         bot_check_updates через определенный промежуток времени.
     """
     if FLAG_TIMER:  # если юзер еще не ввел команду stop/exit
+        logger.info('Checking updates for users')
         for user_id in cli.users_command():
             user = cli.login_command(user_id)
             result = cli.check_updates(user)
@@ -57,8 +54,9 @@ def repeater():
     """Запускает ф-ию через заданный период времени.
     """
     # interval=600 - заданный период - 600сек.
-    t = Timer(interval=600, function=bot_check_updates, args=(repeater,))
+    t = threading.Timer(interval=600, function=bot_check_updates, args=(repeater,))
     t.start()
+    logger.info(f'Timer has started in {threading.current_thread().name}')
 
 
 def main():
