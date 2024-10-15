@@ -25,11 +25,15 @@ handlers:
     formatter: default
 
 loggers:
-  run_bot:
+  bot_get_issues.run_bot:
     level: INFO
     handlers: [stdout, error_file]
 
   logic.cli:
+    level: INFO
+    handlers: [stdout, error_file]
+
+  logic.database:
     level: INFO
     handlers: [stdout, error_file]
 
