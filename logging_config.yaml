@@ -33,6 +33,10 @@ loggers:
     level: INFO
     handlers: [stdout, error_file]
 
+  logic.database:
+    level: INFO
+    handlers: [stdout, error_file]
+
 root:
   formatter: default
   handlers: [default]

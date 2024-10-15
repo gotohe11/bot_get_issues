@@ -6,7 +6,10 @@ from environs import Env
 from typing import Any
 
 from logic import cli
+from logic.database import Database
 
+
+DB = Database()
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +17,6 @@ env = Env()  # создаем экземпляр класса Env
 env.read_env()  # м-м read_env() читаем .env и загружаем переменные в окр-е
 API_TOKEN = env('API_TOKEN')
 bot = telebot.TeleBot(API_TOKEN)
-
-FLAG_TIMER = True  # переключатель для ф-ии bot_check_updates
 
 
 def bot_print_func(user_id: str, item: Any):
@@ -36,18 +37,16 @@ def bot_print_func(user_id: str, item: Any):
 
 
 def bot_check_updates(repeater_: Callable):
-    """Периодически проверяет новые исусы у пользователя в подписках.
+    """Периодически проверяет новые исусы у пользователей в подписках.
     :param repeater_: функция-планировщик, выполняющая ф-ию
         bot_check_updates через определенный промежуток времени.
     """
-    if FLAG_TIMER:  # если юзер еще не ввел команду stop/exit
-        logger.info('Checking updates for users')
-        for user_id in cli.users_command():
-            user = cli.login_command(user_id)
-            result = cli.check_updates(user)
-            if result:  # посылать уведомление пользователю
-                bot_print_func(user_id, result)
-        repeater_()
+    logger.info('Checking updates for users')
+    for user in DB.get_all_users():
+        result = cli.check_updates(user)
+        if result:  # посылать уведомление пользователю
+            bot_print_func(user.user_id, result)
+    repeater_()
 
 
 def repeater():
@@ -68,14 +67,6 @@ def main():
             f'I am a bot that brings issues from github by your request.\n'
             f'Use </help> command to understand what can i do.'
         ))
-
-
-    @bot.message_handler(commands=['exit', 'stop'])
-    def exit_cmd(message):
-        bot.send_message(message.chat.id, f'Bye-bye, {message.from_user.first_name}!')
-        bot.stop_polling()
-        global FLAG_TIMER
-        FLAG_TIMER = False
 
 
     @bot.message_handler(content_types=['text'])
@@ -99,7 +90,7 @@ def main():
         else:
             bot_print_func(message.chat.id, result)
 
-    bot_check_updates(repeater)  # запускаем проверку обновлений подписок юзера
+    bot_check_updates(repeater)  # запускаем проверку обновлений подписок у юзеров
     bot.polling(none_stop=True)
 
 

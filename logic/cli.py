@@ -52,11 +52,6 @@ def help_command() -> str:
     return '\n'.join(res)
 
 
-@dec_command('exit',  'exit;')
-def exit_command():
-    pass
-
-
 def _get_issues_list_from_github(project_name: str) -> list[tuple[int | str]]:
     """Загружает с github список исусов репозитория.
     :param project_name: имя репозитория.
@@ -399,21 +394,17 @@ def status_command() -> list[tuple[int | str]]:
 
 @dec_command('users',
              'prints a list of all registered users.')
-def users_command() -> list[str] | str:
-    """Выводит инф-ию о зарегистрированных пользователях.
-    :raises: FileNotFoundError: ошибка чтения файла.
-    :return: Список пользователей или сообщение об
+def users_command() -> str:
+    """Выводит информацию о зарегистрированных пользователях.
+    :return: Список имен пользователей или сообщение об
         их отсутствии.
     """
-    try:
-        with open(DB.path, 'r', encoding='utf-8') as file:
-            data = json.load(file)
-    except FileNotFoundError as er:
-        msg = 'No users yet.'
-        logger.exception(msg)
-        return msg
-
-    return list(data.keys())
+    data = DB.get_all_users()
+    if data:
+        names = [user.name for user in data]
+        return 'Registered users: ' + ', '.join(names)
+    else:
+        return 'No users yet.'
 
 
 def run_one(command: str) -> Callable[[str], Any]:

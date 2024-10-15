@@ -1,7 +1,11 @@
 import json
 import os.path
+import logging
 
 from logic.users import User
+
+
+logger = logging.getLogger(__name__)
 
 
 class Database:
@@ -14,7 +18,7 @@ class Database:
     def __init__(self, path=os.path.expanduser('~/users_data.json')):
         self.path = path
 
-    def load_or_create_user(self, user_id: str, user_name: str) -> User:
+    def load_or_create_user(self, user_id: str, user_name: str = None) -> User:
         """Выгружает существующего пользователя
         из БД или создает нового.
         :param user_id: id пользователя тг.
@@ -25,7 +29,8 @@ class Database:
         try:
             with open(self.path, 'r', encoding='utf-8') as file:
                 data = json.load(file)
-        except FileNotFoundError:
+        except FileNotFoundError as er:
+            logger.exception(er)
             with open(self.path, 'w', encoding='utf-8') as file:
                 data = {}
                 json.dump(data, file, indent=2)
@@ -55,3 +60,17 @@ class Database:
             file.seek(0)
             json.dump(data, file, indent=2)
             file.truncate()
+
+    def get_all_users(self) -> list[User]:
+        """Выдает информацию о зарегистрированных пользователях.
+        :return: Список экземпляров класса User всех пользователей.
+        """
+        try:
+            with open(self.path, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+        except FileNotFoundError as er:
+            data = {}
+            logger.exception(er)
+
+        res = [self.load_or_create_user(user_id) for user_id in data.keys()]
+        return res
