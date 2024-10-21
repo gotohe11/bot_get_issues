@@ -1,0 +1,4 @@
+
+services:
+  python-bot:
+    build: .

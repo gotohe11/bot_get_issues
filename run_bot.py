@@ -1,22 +1,32 @@
 import logging
+import logging.config
 import telebot
 import threading
+import yaml
 from collections.abc import Callable
 from environs import Env
 from typing import Any
 
-from logic import cli
-from logic.database import Database
+from .logic import cli
+from .logic.database import Database
+from .logic.github import GithubError
 
 
 DB = Database()
-
 logger = logging.getLogger(__name__)
 
 env = Env()  # создаем экземпляр класса Env
 env.read_env()  # м-м read_env() читаем .env и загружаем переменные в окр-е
 API_TOKEN = env('API_TOKEN')
 bot = telebot.TeleBot(API_TOKEN)
+
+
+def load_log_settings():
+    """Подружает настройки логирования из yml-файла.
+    """
+    with open('bot_get_issues/logging_config.yaml', 'rt') as f:
+        config = yaml.safe_load(f.read())
+    logging.config.dictConfig(config)
 
 
 def bot_print_func(user_id: str, item: Any):
@@ -43,17 +53,21 @@ def bot_check_updates(repeater_: Callable):
     """
     logger.info('Checking updates for users')
     for user in DB.get_all_users():
-        result = cli.check_updates(user)
-        if result:  # посылать уведомление пользователю
-            bot_print_func(user.user_id, result)
+        try:
+            result = cli.check_updates(user)
+            if result:  # посылать уведомление пользователю
+                bot_print_func(user.user_id, result)
+        except GithubError as er:
+            bot_print_func(user.user_id,
+                           'Error communication with GitHub. Try later!')
     repeater_()
 
 
 def repeater():
     """Запускает ф-ию через заданный период времени.
     """
-    # interval=600 - заданный период - 600сек.
-    t = threading.Timer(interval=600, function=bot_check_updates, args=(repeater,))
+    # interval=6000 - заданный период - 6000сек.
+    t = threading.Timer(interval=6000, function=bot_check_updates, args=(repeater,))
     t.start()
     logger.info(f'Timer has started in {threading.current_thread().name}')
 
@@ -90,6 +104,8 @@ def main():
         else:
             bot_print_func(message.chat.id, result)
 
+
+    load_log_settings()  # подгружаем настройки логгирования
     bot_check_updates(repeater)  # запускаем проверку обновлений подписок у юзеров
     bot.polling(none_stop=True)
 

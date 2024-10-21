@@ -2,7 +2,7 @@ import json
 import os.path
 import logging
 
-from logic.users import User
+from .users import User
 
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,6 @@ class Database:
         except FileNotFoundError as er:
             data = {}
             logger.exception(er)
-
+        logger.debug('DB is getting all users')
         res = [self.load_or_create_user(user_id) for user_id in data.keys()]
         return res

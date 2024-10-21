@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from logic.subscriptions import Subscription
+from .subscriptions import Subscription
 
 
 @dataclass
