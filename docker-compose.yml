@@ -4,4 +4,4 @@ services:
     build: .
     volumes:
       - ./logs:/var/log
-      - ~/my_projects:/opt/bot_get_issues
+      - ~/my_projects/bot_get_issues:/opt/bot_get_issues
