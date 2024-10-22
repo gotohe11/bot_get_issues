@@ -14,14 +14,14 @@ handlers:
   stdout:
     class: logging.StreamHandler
     formatter: default
-    level: INFO
+    level: DEBUG
     stream: ext://sys.stdout
 
   error_file:
     class: logging.FileHandler
-    filename: bot_errors.log
+    filename: bot_get_issues/logs/bot_logs.log
     mode: w
-    level: INFO
+    level: DEBUG
     formatter: default
 
 loggers:
@@ -29,12 +29,12 @@ loggers:
     level: INFO
     handlers: [stdout, error_file]
 
-  logic.cli:
-    level: INFO
+  bot_get_issues.logic.cli:
+    level: DEBUG
     handlers: [stdout, error_file]
 
-  logic.database:
-    level: INFO
+  bot_get_issues.logic.database:
+    level: DEBUG
     handlers: [stdout, error_file]
 
 root:

@@ -11,8 +11,8 @@ from typing import Any
 from . import errors
 from . import database
 from . import github
-from logic.subscriptions import Subscription
-from logic.users import User
+from .subscriptions import Subscription
+from .users import User
 
 
 logger = logging.getLogger(__name__)
@@ -375,6 +375,7 @@ def status_command() -> list[tuple[int | str]]:
     :return: Список с информацией о состоянии
         подписок пользователя.
     """
+    logger.debug('Getting info about user')
     global USER
     subs_list = []
     if USER.subs:
@@ -418,6 +419,7 @@ def run_one(command: str) -> Callable[[str], Any]:
     :return: Значение по ключу-команде в
         словаре COMMANDS.
     """
+    logger.debug(f'Processing the command {command}')
     parts = command.lower().split()
     cmd = parts[0]
     if len(parts) > 1:
@@ -430,6 +432,6 @@ def run_one(command: str) -> Callable[[str], Any]:
 
     try:
         return COMMANDS[cmd](*args)
-    except TypeError as er:
-        logger.exception(er)
+    except Exception as er:
+        logging.exception(er)
         raise errors.CommandArgsError('Wrong number of arguments provided.')

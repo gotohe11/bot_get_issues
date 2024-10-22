@@ -1,0 +1,7 @@
+services:
+  python-bot:
+    restart: always
+    build: .
+    volumes:
+      - ./logs:/var/log
+      - ~/my_projects:/opt/bot_get_issues
