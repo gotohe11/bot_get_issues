@@ -22,7 +22,7 @@ bot = telebot.TeleBot(API_TOKEN)
 
 
 def load_log_settings():
-    """Подружает настройки логирования из yml-файла.
+    """Подгружает настройки логирования из yml-файла.
     """
     with open('bot_get_issues/logging_config.yaml', 'rt') as f:
         config = yaml.safe_load(f.read())

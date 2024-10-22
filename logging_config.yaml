@@ -19,9 +19,9 @@ handlers:
 
   error_file:
     class: logging.FileHandler
-    filename: bot_errors.log
+    filename: bot_get_issues/logs/bot_logs.log
     mode: w
-    level: INFO
+    level: DEBUG
     formatter: default
 
 loggers:
