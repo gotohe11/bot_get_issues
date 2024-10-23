@@ -1,0 +1,5 @@
+[2024-10-23 12:22:19,063] #INFO     run_bot.py:54 - bot_get_issues.run_bot:bot_check_updates - Checking updates for users
+[2024-10-23 12:22:19,064] #DEBUG    database.py:74 - bot_get_issues.logic.database:get_all_users - DB is getting all users
+[2024-10-23 12:22:19,064] #INFO     cli.py:363 - bot_get_issues.logic.cli:check_updates - Checking shobrook/rebound updates
+[2024-10-23 12:22:20,127] #INFO     cli.py:363 - bot_get_issues.logic.cli:check_updates - Checking s0md3v/photon updates
+[2024-10-23 12:22:21,929] #INFO     run_bot.py:72 - bot_get_issues.run_bot:repeater - Timer has started in MainThread
