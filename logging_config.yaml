@@ -19,7 +19,7 @@ handlers:
 
   error_file:
     class: logging.FileHandler
-    filename: bot_get_issues/logs/bot_logs.log
+    filename: bot_get_issues/bot_logs/bot_logs.log
     mode: w
     level: DEBUG
     formatter: default
