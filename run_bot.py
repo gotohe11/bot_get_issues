@@ -1,5 +1,6 @@
 import logging
 import logging.config
+import os
 import telebot
 import threading
 import yaml
@@ -22,8 +23,11 @@ bot = telebot.TeleBot(API_TOKEN)
 
 
 def load_log_settings():
-    """Подгружает настройки логирования из yml-файла.
+    """Подгружает настройки логирования из yml-файла,
+    создает необходимые папки для логов.
     """
+    os.makedirs(os.path.dirname('bot_get_issues/logs/bot_logs.log'), exist_ok=True)
+    os.makedirs(os.path.dirname('bot_get_issues/bot_logs/bot_logs.log'), exist_ok=True)
     with open('bot_get_issues/logging_config.yaml', 'rt') as f:
         config = yaml.safe_load(f.read())
     logging.config.dictConfig(config)
@@ -64,10 +68,9 @@ def bot_check_updates(repeater_: Callable):
 
 
 def repeater():
-    """Запускает ф-ию через заданный период времени.
+    """Запускает ф-ию через заданный период времени в секундах.
     """
-    # interval=6000 - заданный период - 6000сек.
-    t = threading.Timer(interval=6000, function=bot_check_updates, args=(repeater,))
+    t = threading.Timer(interval=1200, function=bot_check_updates, args=(repeater,))
     t.start()
     logger.info(f'Timer has started in {threading.current_thread().name}')
 
@@ -107,7 +110,7 @@ def main():
 
     load_log_settings()  # подгружаем настройки логгирования
     bot_check_updates(repeater)  # запускаем проверку обновлений подписок у юзеров
-    bot.polling(none_stop=True)
+    bot.infinity_polling(timeout=10, long_polling_timeout=5)
 
 
 if __name__ == '__main__':

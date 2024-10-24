@@ -5,3 +5,4 @@ services:
     volumes:
       - ./logs:/var/log
       - /src/bot_get_issues:/opt/bot_get_issues
+      - ./data:/data

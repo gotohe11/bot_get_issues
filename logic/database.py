@@ -1,6 +1,6 @@
 import json
-import os.path
 import logging
+import os
 
 from .users import User
 
@@ -15,7 +15,7 @@ class Database:
     класса User.
     :param path: путь к файлу с БД.
     """
-    def __init__(self, path=os.path.expanduser('~/users_data.json')):
+    def __init__(self, path='bot_get_issues/data/users_data.json'):
         self.path = path
 
     def load_or_create_user(self, user_id: str, user_name: str = None) -> User:
@@ -31,6 +31,7 @@ class Database:
                 data = json.load(file)
         except FileNotFoundError as er:
             logger.exception(er)
+            os.makedirs(os.path.dirname(self.path), exist_ok=True)
             with open(self.path, 'w', encoding='utf-8') as file:
                 data = {}
                 json.dump(data, file, indent=2)
