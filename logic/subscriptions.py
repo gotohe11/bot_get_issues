@@ -18,10 +18,11 @@ class Subscription:
         :param dct: данные о подписке в виде словаря.
         :return: экземпляр класса Subscription.
         """
-        name = dct['name']
-        issues_list = [tuple(item) for item in dct['issues_list']]
-        last_issue_num = dct['last_issue_num']
-        return cls(name, issues_list, last_issue_num)
+        if dct:
+            name = dct['name']
+            issues_list = [tuple(item) for item in dct['issues_list']]
+            last_issue_num = dct['last_issue_num']
+            return cls(name, issues_list, last_issue_num)
 
     def read_issues(self, num: int):
         """Меняет значение атрибута класса last_issue_num.

@@ -58,6 +58,8 @@ class Database:
         with open(self.path, 'r+', encoding='utf-8') as file:
             data = json.load(file)
             data[user.user_id]['subs'] = {k: v.__dict__ for k, v in user.subs.items()}
+            if user.last_project:
+                data[user.user_id]['last_project'] = user.last_project.__dict__
             file.seek(0)
             json.dump(data, file, indent=2)
             file.truncate()

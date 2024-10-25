@@ -2,7 +2,6 @@
 Здесь прописаны все функции для исполнения команд тг-бота.
 """
 import functools
-import json
 import logging
 from collections.abc import Callable
 from datetime import date
@@ -67,11 +66,11 @@ def _get_issues_list_from_github(project_name: str) -> list[tuple[int | str]]:
         try:
             issues_list = github.make_issues_list(project_name)
         except github.ProjectNotFoundError:
-            logging.exception(f'Project "{project_name}" not found, check your spelling.')
+            logger.exception(f'Project "{project_name}" not found, check your spelling.')
             res_list = []
             break
         except github.GithubError as err:
-            logging.exception(f'Error communicating with Github: {err}')
+            logger.exception(f'Error communicating with Github: {err}')
             break
         success = True
         return issues_list
@@ -95,6 +94,7 @@ def get_command(project_name: str) -> str:
     issues_list = _get_issues_list_from_github(project_name)
     if issues_list:
         USER.last_project = Subscription(project_name, issues_list, 0)
+        DB.save_sub(USER)  # записываем в файлик
         msg = (f'There are {len(issues_list)} issues in the "{project_name}" repository.'
                f' Use /sub, /next or /print commands.')
         return msg
@@ -140,11 +140,11 @@ def print_command(issue_number: int = None) -> list[tuple[int | str]]:
     # замена последнего просмотренного исуса текущего проекта
     USER.last_project.read_issues(skip+limit)
     project_name = USER.last_project.name
-    # если юзер подписан на репо, то меняем последний просмотренный исус
+    # если юзер подписан на репо, то меняем последний просмотренный исус в подписке
     if project_name in USER.subs:
         USER.subs[project_name].read_issues(skip+limit)
-        DB.save_sub(USER)  # записываем в файлик
 
+    DB.save_sub(USER)  # записываем в файлик
     return issues_list[skip:skip+limit]
 
 
@@ -173,10 +173,11 @@ def next_command() -> list[tuple[int | str]]:
         # замена последнего просмотренного исуса текущего проекта
         USER.last_project.read_issues(num_2)
         project_name = USER.last_project.name
-        # если юзер подписан на репо, то меняем последний просмотренный исус
+        # если юзер подписан на репо, то меняем последний просмотренный исус в подписке
         if project_name in USER.subs:
-                USER.subs[project_name].read_issues(num_2)
-                DB.save_sub(USER)  # записываем в файлик
+            USER.subs[project_name].read_issues(num_2)
+
+        DB.save_sub(USER)  # записываем в файлик
         return issues_list[num_1:num_2]
 
 
@@ -433,5 +434,5 @@ def run_one(command: str) -> Callable[[str], Any]:
     try:
         return COMMANDS[cmd](*args)
     except Exception as er:
-        logging.exception(er)
-        raise errors.CommandArgsError('Wrong number of arguments provided.')
+        logger.exception(er)
+        raise TypeError(er)

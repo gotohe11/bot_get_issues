@@ -92,8 +92,7 @@ def main():
         :param message: сообщение в тг-боте.
         :raises: любая ошибка модуля cli.
         """
-        if not cli.USER:
-            cli.login_command(str(message.from_user.id), message.from_user.first_name)
+        cli.login_command(str(message.from_user.id), message.from_user.first_name)
         try:
             result = cli.run_one(message.text)
         except Exception as er:

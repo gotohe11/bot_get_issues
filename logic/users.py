@@ -52,4 +52,5 @@ class User:
             k: Subscription.from_dict(v)
             for k, v in dct['subs'].items()
         }
-        return cls(user_id, name, subs)  # без посл просм проекта
+        last_project = Subscription.from_dict(dct['last_project'])
+        return cls(user_id, name, subs, last_project)
