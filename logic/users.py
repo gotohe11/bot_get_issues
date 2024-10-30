@@ -54,3 +54,15 @@ class User:
         }
         last_project = Subscription.from_dict(dct['last_project'])
         return cls(user_id, name, subs, last_project)
+
+    def to_dict(self) -> dict:
+        """Преобразует экземпляр класса в словарь.
+        :return: экземпляр класса в виде словаря.
+        """
+        data = {
+            'user_id': self.user_id,
+            'name': self.name,
+            'subs': {k: v.to_dict() for k, v in self.subs.items()},
+            'last_project': self.last_project.to_dict() if self.last_project else None
+        }
+        return data

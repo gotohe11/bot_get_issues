@@ -1,11 +1,13 @@
 import json
 import logging
-import os
+
+import redis
 
 from .users import User
 
 
 logger = logging.getLogger(__name__)
+redis_client = redis.Redis(host='redis', port=6379, db=0)
 
 
 class Database:
@@ -13,12 +15,9 @@ class Database:
     Записывает и считывает данные о пользователях.
     Если пользователь новый - создает новый экземпляр
     класса User.
-    :param path: путь к файлу с БД.
     """
-    def __init__(self, path='bot_get_issues/data/users_data.json'):
-        self.path = path
-
-    def load_or_create_user(self, user_id: str, user_name: str = None) -> User:
+    @staticmethod
+    def load_or_create_user(user_id: str, user_name: str = None) -> User:
         """Выгружает существующего пользователя
         из БД или создает нового.
         :param user_id: id пользователя тг.
@@ -26,54 +25,33 @@ class Database:
         :raises FileNotFoundError: еще нет БД.
         :return: экземпляр класса User.
         """
-        try:
-            with open(self.path, 'r', encoding='utf-8') as file:
-                data = json.load(file)
-        except FileNotFoundError as er:
-            logger.exception(er)
-            os.makedirs(os.path.dirname(self.path), exist_ok=True)
-            with open(self.path, 'w', encoding='utf-8') as file:
-                data = {}
-                json.dump(data, file, indent=2)
-        if data and user_id in data:
-            user = User.from_dict(data[user_id])
+        data_from_redis = redis_client.get(user_id)
+        if data_from_redis:
+            # десериализация данных в словарь
+            data_loaded = json.loads(data_from_redis.decode('utf-8'))
+            logger.debug('Old user is getting')
+            user = User.from_dict(data_loaded)
         else:
-            user = User(user_id, user_name)
-            Database.save_user(self, user)
+            logger.debug('New user is creating')
+            user = User(user_id, user_name)  # создаем нового юзера
+            user_data = json.dumps(user.to_dict(), indent=2)
+            redis_client.set(user.user_id, user_data)  # записываем его в редис
         return user
 
-    def save_user(self, user: User):
-        """Сохраняет данные пользователя в БД.
-        """
-        with open(self.path, 'r+', encoding='utf-8') as file:
-            data = json.load(file)
-            data[user.user_id] = user.__dict__
-            file.seek(0)
-            json.dump(data, file, indent=2)
-            file.truncate()
-
-    def save_sub(self, user: User):
+    @staticmethod
+    def save_sub(user: User):
         """Сохраняет данные о подписках пользователя в БД.
         """
-        with open(self.path, 'r+', encoding='utf-8') as file:
-            data = json.load(file)
-            data[user.user_id]['subs'] = {k: v.__dict__ for k, v in user.subs.items()}
-            if user.last_project:
-                data[user.user_id]['last_project'] = user.last_project.__dict__
-            file.seek(0)
-            json.dump(data, file, indent=2)
-            file.truncate()
+        logger.debug("Save user's info")
+        user_data = json.dumps(user.to_dict(), indent=2)
+        redis_client.set(user.user_id, user_data)
 
-    def get_all_users(self) -> list[User]:
+    @classmethod
+    def get_all_users(cls) -> list[User]:
         """Выдает информацию о зарегистрированных пользователях.
         :return: Список экземпляров класса User всех пользователей.
         """
-        try:
-            with open(self.path, 'r', encoding='utf-8') as file:
-                data = json.load(file)
-        except FileNotFoundError as er:
-            data = {}
-            logger.exception(er)
         logger.debug('DB is getting all users')
-        res = [self.load_or_create_user(user_id) for user_id in data.keys()]
+        all_users_id = redis_client.scan_iter(match='*', count=100)
+        res = [cls.load_or_create_user(user_id.decode('utf-8')) for user_id in all_users_id]
         return res

@@ -1,7 +1,9 @@
 import logging
 import logging.config
 import os
+import redis
 import telebot
+import time
 import threading
 import yaml
 from collections.abc import Callable
@@ -13,13 +15,29 @@ from .logic.database import Database
 from .logic.github import GithubError
 
 
-DB = Database()
 logger = logging.getLogger(__name__)
 
 env = Env()  # создаем экземпляр класса Env
 env.read_env()  # м-м read_env() читаем .env и загружаем переменные в окр-е
 API_TOKEN = env('API_TOKEN')
 bot = telebot.TeleBot(API_TOKEN)
+
+
+def get_redis_connection(max_retries=5, delay=2):
+    """Проверяет подключение к redis.
+    :param max_retries: максимальное количество попыток подключения.
+    :param delay: задержка между попытками подключения (в сек.).
+    :raises: redis.ConnectionError.
+    """
+    for attempt in range(max_retries):
+        try:
+            r = redis.Redis(host='redis', port=6379, db=0, socket_connect_timeout=2)
+            r.ping()
+            logger.debug("Successful connection to Redis.")
+        except redis.ConnectionError:
+            logger.warning(f"Redis error connection. Attempt {attempt + 1}/{max_retries}.")
+            time.sleep(delay)
+    logger.error("Failed to connect to Redis after several attempts.")
 
 
 def load_log_settings():
@@ -56,7 +74,7 @@ def bot_check_updates(repeater_: Callable):
         bot_check_updates через определенный промежуток времени.
     """
     logger.info('Checking updates for users')
-    for user in DB.get_all_users():
+    for user in Database.get_all_users():
         try:
             result = cli.check_updates(user)
             if result:  # посылать уведомление пользователю
@@ -108,6 +126,7 @@ def main():
 
 
     load_log_settings()  # подгружаем настройки логгирования
+    get_redis_connection()  # проверяем подключение к redis
     bot_check_updates(repeater)  # запускаем проверку обновлений подписок у юзеров
     bot.infinity_polling(timeout=10, long_polling_timeout=5)
 

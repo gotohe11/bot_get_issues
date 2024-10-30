@@ -26,7 +26,7 @@ handlers:
 
 loggers:
   bot_get_issues.run_bot:
-    level: INFO
+    level: DEBUG
     handlers: [stdout, error_file]
 
   bot_get_issues.logic.cli:

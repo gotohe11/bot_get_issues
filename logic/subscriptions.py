@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 
 
 @dataclass
@@ -31,3 +31,9 @@ class Subscription:
             self.last_issue_num = num
         else:
             self.last_issue_num = len(self.issues_list)
+
+    def to_dict(self) -> dict:
+        """Преобразует экземпляр класса в словарь.
+        :return: экземпляр класса в виде словаря.
+        """
+        return asdict(self)
