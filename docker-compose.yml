@@ -4,8 +4,7 @@ services:
     build: .
     volumes:
       - ./logs:/var/log
-      #- /src/bot_get_issues:/opt/bot_get_issues
-      - /data:/data
+      - /src/bot_get_issues:/opt/bot_get_issues  # на серваке в src хранится проект с гит
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -18,7 +17,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis-data:/data
+      - redis-data:/data  # "Mountpoint": "/var/lib/docker/volumes/bot_get_issues_redis-data/_data"
 
 volumes:
   redis-data:

@@ -44,6 +44,7 @@ def load_log_settings():
     """Подгружает настройки логирования из yml-файла,
     создает необходимые папки для логов.
     """
+    logger.debug('Creating new directories for logs and loading log configs.')
     os.makedirs(os.path.dirname('bot_get_issues/logs/bot_logs.log'), exist_ok=True)
     os.makedirs(os.path.dirname('bot_get_issues/bot_logs/bot_logs.log'), exist_ok=True)
     with open('bot_get_issues/logging_config.yaml', 'rt') as f:
