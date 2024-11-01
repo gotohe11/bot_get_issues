@@ -4,18 +4,24 @@ services:
     build: .
     volumes:
       - ./logs:/var/log
-      - /src/bot_get_issues:/opt/bot_get_issues  # на серваке в src хранится проект с гит
+      - /src/bot_get_issues:/opt/bot_get_issues  # на хосте в src хранится проект с гит
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:
-      - redis
+       redis:
+          condition: service_healthy
 
   redis:
     image: redis:latest
     command: [ "redis-server", "--appendonly", "yes", "--bind", "0.0.0.0" ]
     ports:
       - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - redis-data:/data  # "Mountpoint": "/var/lib/docker/volumes/bot_get_issues_redis-data/_data"
 
