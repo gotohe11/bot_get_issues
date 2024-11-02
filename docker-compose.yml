@@ -16,7 +16,7 @@ services:
 
   redis:
     image: redis:latest
-    command: [ "redis-server", "--appendonly", "yes", "--bind", "0.0.0.0" ]
+    command: [ "redis-server", "--appendonly", "yes", "--bind", "0.0.0.0", "--requirepass", "Prodam_Garaj_8-963-852-74-10"]
     networks:
       - my_network
     healthcheck:

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 def redis_client():
     """Подключение к redis БД.
     """
-    return redis.Redis(host='redis', port=6379, db=0)
+    return redis.Redis(host='redis', port=6379, db=0, password='Prodam_Garaj_8-963-852-74-10')
 
 
 class Database:
