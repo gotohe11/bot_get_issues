@@ -4,7 +4,9 @@ services:
     build: .
     volumes:
       - ./logs:/var/log
-      - /src/bot_get_issues:/opt/bot_get_issues  # на хосте в src хранится проект с гит
+#      - /src/bot_get_issues:/opt/bot_get_issues  # на хосте в src хранится проект с гит
+    networks:
+      - my_network
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -15,8 +17,8 @@ services:
   redis:
     image: redis:latest
     command: [ "redis-server", "--appendonly", "yes", "--bind", "0.0.0.0" ]
-    ports:
-      - "6379:6379"
+    networks:
+      - my_network
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
@@ -27,3 +29,6 @@ services:
 
 volumes:
   redis-data:
+
+networks:
+  my_network:

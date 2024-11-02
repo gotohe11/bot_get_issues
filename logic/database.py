@@ -36,10 +36,10 @@ class Database:
         if data_from_redis:
             # десериализация данных в словарь
             data_loaded = json.loads(data_from_redis.decode('utf-8'))
-            logger.debug('Old user is getting')
+            logger.debug(f'Old user:{user_id} is getting')
             user = User.from_dict(data_loaded)
         else:
-            logger.debug('New user is creating')
+            logger.debug(f'New user:{user_id} is creating')
             user = User(user_id, user_name)  # создаем нового юзера
             user_data = json.dumps(user.to_dict(), indent=2)
             redis_client().set(f'user:{user_id}', user_data)  # записываем его в редис
@@ -49,7 +49,7 @@ class Database:
     def save_sub(user: User):
         """Сохраняет данные о подписках пользователя в БД.
         """
-        logger.debug("Save user's info")
+        logger.debug(f'Save user:{user.user_id} info')
         user_data = json.dumps(user.to_dict(), indent=2)
         redis_client().set(f'user:{user.user_id}', user_data)
 
