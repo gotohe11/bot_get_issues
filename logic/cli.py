@@ -8,15 +8,14 @@ from datetime import date
 from typing import Any
 
 from . import errors
-from . import database
 from . import github
+from .database import Database
 from .subscriptions import Subscription
 from .users import User
 
 
 logger = logging.getLogger(__name__)
 
-DB = database.Database()  # класс ДБ, путь сохранение - по умолчанию
 USER = None  # несет экземпляр класса юзер
 
 INFO = []
@@ -94,7 +93,7 @@ def get_command(project_name: str) -> str:
     issues_list = _get_issues_list_from_github(project_name)
     if issues_list:
         USER.last_project = Subscription(project_name, issues_list, 0)
-        DB.save_sub(USER)  # записываем в файлик
+        Database.save_sub(USER)  # записываем в файлик
         msg = (f'There are {len(issues_list)} issues in the "{project_name}" repository.'
                f' Use /sub, /next or /print commands.')
         return msg
@@ -144,7 +143,7 @@ def print_command(issue_number: int = None) -> list[tuple[int | str]]:
     if project_name in USER.subs:
         USER.subs[project_name].read_issues(skip+limit)
 
-    DB.save_sub(USER)  # записываем в файлик
+    Database.save_sub(USER)  # записываем в файлик
     return issues_list[skip:skip+limit]
 
 
@@ -177,7 +176,7 @@ def next_command() -> list[tuple[int | str]]:
         if project_name in USER.subs:
             USER.subs[project_name].read_issues(num_2)
 
-        DB.save_sub(USER)  # записываем в файлик
+        Database.save_sub(USER)  # записываем в файлик
         return issues_list[num_1:num_2]
 
 
@@ -191,7 +190,7 @@ def login_command(user_id: str, user_name: str = None) -> User:
     :return: Экземпляр класса User.
     """
     global USER
-    USER = DB.load_or_create_user(user_id, user_name)
+    USER = Database.load_or_create_user(user_id, user_name)
     logger.info(f'Login {USER.name}.')
     return USER
 
@@ -224,7 +223,7 @@ def sub_command(project_name: str = None) -> str:
 
     try:
         USER.add_subsc(project_obj)
-        DB.save_sub(USER)  # просто переписываем весь список подписок юзера заново
+        Database.save_sub(USER)  # просто переписываем весь список подписок юзера заново
         msg = f'{USER.name}, you subscribed to "{project_name}" repository.'
         logger.info(msg)
         return msg
@@ -250,7 +249,7 @@ def unsub_command(project_name: str = None) -> str:
 
     try:
         USER.remove_subsc(project_name)  # удаляем ненужную подписку из списка подписок юзера
-        DB.save_sub(USER)  # просто переписываем весь список подписок юзера заново
+        Database.save_sub(USER)  # просто переписываем весь список подписок юзера заново
         msg = f'{USER.name}, you unsubscribed from the "{project_name}" repository.'
         logger.info(msg)
         return msg
@@ -346,7 +345,7 @@ def update_command(since_date: str = None) -> list[Any] | str:
             logger.info(msg)
             result.append(msg)
 
-    DB.save_sub(USER)
+    Database.save_sub(USER)
     return result
 
 
@@ -364,7 +363,7 @@ def check_updates(user: User) -> list[Any]:
             logger.info(f'Checking {subscription.name} updates')
             result = _update_one_sub(subscription, last_issue_date)
             new_issues_list.extend(result)
-            DB.save_sub(user)
+            Database.save_sub(user)
 
         return new_issues_list
 
@@ -401,7 +400,7 @@ def users_command() -> str:
     :return: Список имен пользователей или сообщение об
         их отсутствии.
     """
-    data = DB.get_all_users()
+    data = Database.get_all_users()
     if data:
         names = [user.name for user in data]
         return 'Registered users: ' + ', '.join(names)
